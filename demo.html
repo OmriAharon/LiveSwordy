@@ -98,13 +98,17 @@
 
     function activatePlayer(player, id, color) {
         //Enter Code
+        player.gameId = id;
+        player.color = +('0x' + color.toUpperCase());
         player.graphics = game.add.graphics(0, 0);
         player.graphics.lineStyle(3, player.color, 1);
         player.graphics.drawCircle(player.x + 14, player.y + 16, 20);
+        connectedPlayers++;
     }
 
     function setPlayerMovementDirection(player, order) {
         //Enter Code
+        player[order.direction] = order.status === 'on';
     }
 
     function updatePlayerMovements() {
@@ -159,6 +163,42 @@
     function openServer() {
         //Enter Code
         playersRef = new Firebase('https://shining-heat-5036.firebaseio.com/swordy/players');
+        playersRef.remove();
+
+        playersRef.on('child_added', function (player) {
+            if (gameReady)
+                return;
+
+            var newPlayer = player.val();
+            var playerToUpdate;
+            for (var i = 0; i < players.length; i++) {
+                if (!player.gameId) {
+                    playerToUpdate = players[i];
+                    break;
+                }
+            }
+
+            activatePlayer(playerToUpdate, newPlayer.id, newPlayer.color);
+
+            if (connectedPlayers === NUMBER_OF_PLAYERS) {
+                gameReady = true;
+
+                var ordersRef = new Firebase('https://shining-heat-5036.firebaseio.com/swordy/orders');
+                ordersRef.remove();
+
+                ordersRef.on('child_added', function (order) {
+                    var newOrder = order.val();
+
+                    for (var i = 0; i < players.length; i++) {
+                        if (players[i].gameId === newOrder.id) {
+                            setPlayerMovementDirection(players[i], newOrder);
+                        }
+                    }
+                });
+            }
+
+        });
+
     }
 
     function hitSword(player, sword) {
