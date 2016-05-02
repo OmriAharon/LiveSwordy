@@ -51,13 +51,12 @@
 
     // Preload (#3)
     function preload() {
-
         game.load.image('player', 'assets/hero.png');
         game.load.image('sword', 'assets/sword.png');
         game.load.image('tile', 'assets/tile.png');
         game.load.bitmapFont('carrier_command', 'assets/fonts/bitmapFonts/carrier_command.png', 'assets/fonts/bitmapFonts/carrier_command.xml');
-
     }
+
     function setCommonPlayer(xPos) {
         var player = game.add.sprite(xPos, (game.world.height / 2) - 16, 'player');
         game.physics.arcade.enable(player);
@@ -95,7 +94,7 @@
 
     function activatePlayer(player, id, color) {
         player.fbId = id;
-        player.color = +("0x" + color.toUpperCase());
+        player.color = +('0x' + color.toUpperCase());
         player.graphics = game.add.graphics(0, 0);
         player.graphics.lineStyle(3, player.color, 1);
         player.graphics.drawCircle(player.x + 14, player.y + 16, 20);
@@ -234,7 +233,6 @@
 
                 if (players.length === 1) {
                     endGameText.text = 'We have a winner!';
-                    endGameText.text.tint = players[0].color;
                     endGameText.align = 'center';
                     game.paused = true;
                 }
