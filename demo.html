@@ -64,6 +64,8 @@
 
     function createSwordsGroup() {
         //Enter Code
+        swords = game.add.group();
+        swords.enableBody = true;
     }
 
     function createTextObject() {
@@ -76,7 +78,15 @@
 
     // Create (#4)
     function create() {
-        //Enter Code
+        game.physics.startSystem(Phaser.Physics.ARCADE);
+        game.add.tileSprite(0, 0, GAME_WIDTH, GAME_HEIGHT, 'tile');
+
+        createSwordsGroup();
+        createTextObject();
+        createPlayers();
+        openServer();
+
+        graphics = game.add.graphics(0, 0);
     }
 
     function activatePlayer(player, id, color) {
