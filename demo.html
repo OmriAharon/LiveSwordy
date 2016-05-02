@@ -15,7 +15,7 @@
 <script src="https://cdn.firebase.com/js/client/2.2.1/firebase.js"></script>
 <script type="text/javascript">
 
-    var NUMBER_OF_PLAYERS = 3;
+    var NUMBER_OF_PLAYERS = 1;
     var GAME_WIDTH = 1500;
     var GAME_HEIGHT = 900;
     var PLAYER_SPEED = 270;
@@ -26,8 +26,10 @@
     var gameReady = false;
     var endGameText;
     var PI2 = Math.PI * 2;
-    var game = new Phaser.Game(GAME_WIDTH, GAME_HEIGHT, Phaser.AUTO, '', {preload: preload, create: create, update: update});
     var graphics;
+
+    // Game variable (#1)
+    var game = new Phaser.Game(GAME_WIDTH, GAME_HEIGHT, Phaser.AUTO, '', { preload: preload, create: create, update: update });
 
     var data = {
         x: 0,   // coordinate
@@ -44,18 +46,18 @@
         result: false // boolean result
     };
 
+    // Firebase references (#2)
     var playersRef;
-    var playersIdentityRef;
 
+    // Preload (#3)
     function preload() {
 
         game.load.image('player', 'assets/hero.png');
-        game.load.image('sword', 'assets/swordnew.png');
-        game.load.image('bgtile', 'assets/tile.png');
+        game.load.image('sword', 'assets/sword.png');
+        game.load.image('tile', 'assets/tile.png');
         game.load.bitmapFont('carrier_command', 'assets/fonts/bitmapFonts/carrier_command.png', 'assets/fonts/bitmapFonts/carrier_command.xml');
 
     }
-
     function setCommonPlayer(xPos) {
         var player = game.add.sprite(xPos, (game.world.height / 2) - 16, 'player');
         game.physics.arcade.enable(player);
@@ -78,10 +80,11 @@
             setCommonPlayer(xPos * i);
         }
     }
+
+    // Create (#4)
     function create() {
         game.physics.startSystem(Phaser.Physics.ARCADE);
-        game.add.tileSprite(0, 0, GAME_WIDTH, GAME_HEIGHT, 'bgtile');
-        game.input.keyboard.addKey(Phaser.Keyboard.ESC).onDown.add(restartGame, this);
+        game.add.tileSprite(0, 0, GAME_WIDTH, GAME_HEIGHT, 'tile');
 
         createSwordsGroup();
         createPlayers();
@@ -92,15 +95,15 @@
 
     function activatePlayer(player, id, color) {
         player.fbId = id;
-        player.tint = 16777215;
         player.color = +("0x" + color.toUpperCase());
         player.graphics = game.add.graphics(0, 0);
         player.graphics.lineStyle(3, player.color, 1);
         player.graphics.drawCircle(player.x + 14, player.y + 16, 20);
+        connectedPlayers++;
     }
 
     function setPlayerMovementDirection(player, order) {
-        player[order.direction] = order.status === "on" ? true : false;
+        player[order.direction] = order.status === 'on';
     }
 
     function updatePlayerMovements() {
@@ -137,7 +140,6 @@
                 y: 32 - o
             }, {x: 42 - o, y: 50 - o}];
 
-            // precalculated properties -- for efficiency
             sword.changeAngle = 0;
             sword.radii = [];
             sword.angles = [];
@@ -150,11 +152,11 @@
                 sword.angles[i] = ((Math.atan2(dy, dx) + PI2) % PI2) - Math.PI;
             }
 
-            game.physics.arcade.enable(sword);
             setRandomPositionAndSpeed(sword);
         }
     }
 
+    // Update (#5)
     function update() {
 
         if (gameReady) {
@@ -165,38 +167,15 @@
                 players[i].graphics.drawCircle(players[i].x + 14, players[i].y + 16, 20);
                 game.physics.arcade.overlap(players[i], swords, hitSword, null, this);
             }
-//            game.physics.arcade.overlap(player1, swords, hitSword, null, this);
-//            game.physics.arcade.overlap(player2, swords, hitSword, null, this);
 
             updatePlayerMovements();
             createSword();
-
-//            swords.forEachAlive(function (sword) {
-////                sword.rotation += 9;
-////                sword.angle += 3;
-//                sword.changeAngle += 0.05;
-////                sword.anchor.setTo(sword.x, sword.y);
-//                var trxPts = calcTrxPts(sword);
-//                sword.lines = [];
-//                for (var i = 0; i < trxPts.length - 1; i++) {
-//                    sword.lines.push({x1: trxPts[i].x, y1: trxPts[i].y, x2: trxPts[i + 1].x, y2: trxPts[i + 1].y})
-//                }
-//
-//                graphics.beginFill(0xFF0000);
-//                graphics.moveTo(trxPts[0].x, trxPts[0].y);
-//                for (var i = 1; i < trxPts.length; i++) {
-//                    graphics.lineTo(trxPts[i].x, trxPts[i].y);
-//                }
-//                graphics.endFill();
-//            });
         }
     }
 
     function openServer() {
         playersRef = new Firebase('https://shining-heat-5036.firebaseio.com/swordy/players');
-        playersIdentityRef = new Firebase('https://shining-heat-5036.firebaseio.com/swordy/playersIdentity');
         playersRef.remove();
-        playersIdentityRef.remove();
 
         playersRef.on('child_added', function(player) {
 
@@ -204,24 +183,15 @@
                 return;
 
             var newPlayer = player.val();
-            var newIdentity = playersIdentityRef.push();
             var playerToUpdate;
-            var playerIndex;
             for (var i = 0; i < players.length; i++) {
                 if (!players[i].fbId) {
-                    playerIndex = i;
                     playerToUpdate = players[i];
                     break;
                 }
             }
 
             activatePlayer(playerToUpdate, newPlayer.id, newPlayer.color);
-            newIdentity.set({
-                playerId: newPlayer.id,
-                identity: playerIndex
-            });
-
-            connectedPlayers++;
 
             if (connectedPlayers === NUMBER_OF_PLAYERS) {
                 gameReady = true;
@@ -242,32 +212,35 @@
         });
     }
 
-    function restartGame() {
-        playersRef.off();
-        playersIdentityRef.off();
-        connectedPlayers = 0;
-        gameReady = false;
-        graphics.destroy();
+    function hitSword(player, sword) {
+        var heroX = player.x + (player.width / 2);
+        var heroY = player.y + (player.height / 2);
+        var heroR = player.height / 2;
 
-        swords.destroy();
-        for (var i = 0; i < players.length; i++) {
-            if (players[i].graphics) {
-                players[i].graphics.destroy();
+        var trxPts = calcTrxPts(sword);
+        sword.lines = [];
+        for (var i = 0; i < trxPts.length - 1; i++) {
+            sword.lines.push({x1: trxPts[i].x, y1: trxPts[i].y, x2: trxPts[i + 1].x, y2: trxPts[i + 1].y})
+        }
+
+        for (var j = 0; j < sword.lines.length; j++) {
+            var line = sword.lines[j];
+
+            lineSegCircleIntercept(data, line.x1, line.y1, line.x2, line.y2, heroX, heroY, heroR);
+            if (data.result) {
+                players.splice(players.indexOf(player), 1);
+                player.graphics.destroy();
+                player.destroy();
+
+                if (players.length === 1) {
+                    endGameText.text = 'We have a winner!';
+                    endGameText.text.tint = players[0].color;
+                    endGameText.align = 'center';
+                    game.paused = true;
+                }
             }
-            players[i].destroy();
-        }
-        players.splice(0, players.length);
-        if (endGameText) {
-            endGameText.destroy();
         }
 
-        createSwordsGroup();
-        createPlayers();
-        createTextObject();
-        openServer();
-
-        game.add.graphics(0, 0);
-        game.paused = false;
     }
 
     function setRandomPositionAndSpeed(object) {
@@ -325,37 +298,6 @@
             };
         }
         return (trxPts);
-    }
-
-    function hitSword(player, sword) {
-        var heroX = player.x + (player.width / 2);
-        var heroY = player.y + (player.height / 2);
-        var heroR = player.height / 2;
-
-        var trxPts = calcTrxPts(sword);
-        sword.lines = [];
-        for (var i = 0; i < trxPts.length - 1; i++) {
-            sword.lines.push({x1: trxPts[i].x, y1: trxPts[i].y, x2: trxPts[i + 1].x, y2: trxPts[i + 1].y})
-        }
-
-        for (var j = 0; j < sword.lines.length; j++) {
-            var line = sword.lines[j];
-
-            lineSegCircleIntercept(data, line.x1, line.y1, line.x2, line.y2, heroX, heroY, heroR);
-            if (data.result) {
-                players.splice(players.indexOf(player), 1);
-                player.graphics.destroy();
-                player.destroy();
-
-                if (players.length === 1) {
-                    endGameText.text = 'We have a winner!';
-                    endGameText.text.tint = players[0].color;
-                    endGameText.align = 'center';
-                    game.paused = true;
-                }
-            }
-        }
-
     }
 
     function lineSegCircleIntercept(ret, x1, y1, x2, y2, cx, cy, r) {
