@@ -59,7 +59,10 @@
     }
 
     function setCommonPlayer(xPos) {
-        //Enter Code
+        var player = game.add.sprite(xPos, (game.world.height / 2) - 16, 'player');
+        game.physics.arcade.enable(player);
+        player.body.collideWorldBounds = true;
+        players.push(player);
     }
 
     function createSwordsGroup() {
@@ -74,6 +77,10 @@
 
     function createPlayers() {
         //Enter Code
+        var xPos = game.world.width / (NUMBER_OF_PLAYERS + 1);
+        for (var i = 1; i <= NUMBER_OF_PLAYERS; i++) {
+            setCommonPlayer(xPos * i);
+        }
     }
 
     // Create (#4)
