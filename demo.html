@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <title></title>
+    <script type="text/javascript" src="js/phaser.min.js"></script>
+    <style type="text/css">
+        body {
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+
+<script src="https://cdn.firebase.com/js/client/2.2.1/firebase.js"></script>
+<script type="text/javascript">
+
+    var NUMBER_OF_PLAYERS = 3;
+    var GAME_WIDTH = 1500;
+    var GAME_HEIGHT = 900;
+    var PLAYER_SPEED = 270;
+
+    var players = [];
+    var swords;
+    var connectedPlayers = 0;
+    var gameReady = false;
+    var endGameText;
+    var PI2 = Math.PI * 2;
+    var game = new Phaser.Game(GAME_WIDTH, GAME_HEIGHT, Phaser.AUTO, '', {preload: preload, create: create, update: update});
+    var graphics;
+
+    var data = {
+        x: 0,   // coordinate
+        y: 0,
+        x1: 0,   // 2nd coordinate if needed
+        y1: 0,
+        u: 0,   // unit length
+        i: 0,   // index
+        d: 0,   // distance
+        d2: 0,  // distance squared
+        l: 0,   // length
+        nx: 0,  // normal vector
+        ny: 0,
+        result: false // boolean result
+    };
+
+    var playersRef;
+    var playersIdentityRef;
+
+    function preload() {
+
+        game.load.image('player', 'assets/hero.png');
+        game.load.image('sword', 'assets/swordnew.png');
+        game.load.image('bgtile', 'assets/tile.png');
+        game.load.bitmapFont('carrier_command', 'assets/fonts/bitmapFonts/carrier_command.png', 'assets/fonts/bitmapFonts/carrier_command.xml');
+
+    }
+
+    function setCommonPlayer(xPos) {
+        var player = game.add.sprite(xPos, (game.world.height / 2) - 16, 'player');
+        game.physics.arcade.enable(player);
+        player.body.collideWorldBounds = true;
+        players.push(player);
+    }
+
+    function createSwordsGroup() {
+        swords = game.add.group();
+        swords.enableBody = true;
+    }
+
+    function createTextObject() {
+        endGameText = game.add.bitmapText((game.world.width / 2) - 300, (game.world.height / 2) - 16, 'carrier_command', '', 34);
+    }
+
+    function createPlayers() {
+        var xPos = game.world.width / (NUMBER_OF_PLAYERS + 1);
+        for (var i = 1; i <= NUMBER_OF_PLAYERS; i++) {
+            setCommonPlayer(xPos * i);
+        }
+    }
+    function create() {
+        game.physics.startSystem(Phaser.Physics.ARCADE);
+        game.add.tileSprite(0, 0, GAME_WIDTH, GAME_HEIGHT, 'bgtile');
+        game.input.keyboard.addKey(Phaser.Keyboard.ESC).onDown.add(restartGame, this);
+
+        createSwordsGroup();
+        createPlayers();
+        createTextObject();
+        openServer();
+        graphics = game.add.graphics(0, 0);
+    }
+
+    function activatePlayer(player, id, color) {
+        player.fbId = id;
+        player.tint = 16777215;
+        player.color = +("0x" + color.toUpperCase());
+        player.graphics = game.add.graphics(0, 0);
+        player.graphics.lineStyle(3, player.color, 1);
+        player.graphics.drawCircle(player.x + 14, player.y + 16, 20);
+    }
+
+    function setPlayerMovementDirection(player, order) {
+        player[order.direction] = order.status === "on" ? true : false;
+    }
+
+    function updatePlayerMovements() {
+
+        for (var i = 0; i < players.length; i++) {
+            var player = players[i];
+            player.body.velocity.x = 0;
+            player.body.velocity.y = 0;
+
+            if (player.left) {
+                player.body.velocity.x = -PLAYER_SPEED;
+            }
+            if (player.right) {
+                player.body.velocity.x = PLAYER_SPEED;
+            }
+            if (player.up) {
+                player.body.velocity.y = -PLAYER_SPEED;
+            }
+            if (player.down) {
+                player.body.velocity.y = PLAYER_SPEED;
+            }
+        }
+    }
+
+    function createSword() {
+
+        if (Math.random() <= 0.05) {
+
+            var o = 0; //21.5;
+            var sword = swords.create(-100, -100, 'sword');
+            sword.body.immovable = true;
+            sword.pts = [{x: 36 - o, y: 44 - o}, {x: 56 - o, y: 24 - o}, {x: 65 - o, y: 23 - o}, {
+                x: 62 - o,
+                y: 32 - o
+            }, {x: 42 - o, y: 50 - o}];
+
+            // precalculated properties -- for efficiency
+            sword.changeAngle = 0;
+            sword.radii = [];
+            sword.angles = [];
+            sword.lines = [];
+
+            for (var i = 0; i < sword.pts.length; i++) {
+                var dx = (sword.width / 2) - sword.pts[i].x;
+                var dy = (sword.height / 2) - sword.pts[i].y;
+                sword.radii[i] = Math.sqrt(dx * dx + dy * dy);
+                sword.angles[i] = ((Math.atan2(dy, dx) + PI2) % PI2) - Math.PI;
+            }
+
+            game.physics.arcade.enable(sword);
+            setRandomPositionAndSpeed(sword);
+        }
+    }
+
+    function update() {
+
+        if (gameReady) {
+            for (var i = 0; i < players.length; i++) {
+                players[i].graphics.destroy();
+                players[i].graphics = game.add.graphics(0, 0);
+                players[i].graphics.lineStyle(3, players[i].color, 1);
+                players[i].graphics.drawCircle(players[i].x + 14, players[i].y + 16, 20);
+                game.physics.arcade.overlap(players[i], swords, hitSword, null, this);
+            }
+//            game.physics.arcade.overlap(player1, swords, hitSword, null, this);
+//            game.physics.arcade.overlap(player2, swords, hitSword, null, this);
+
+            updatePlayerMovements();
+            createSword();
+
+//            swords.forEachAlive(function (sword) {
+////                sword.rotation += 9;
+////                sword.angle += 3;
+//                sword.changeAngle += 0.05;
+////                sword.anchor.setTo(sword.x, sword.y);
+//                var trxPts = calcTrxPts(sword);
+//                sword.lines = [];
+//                for (var i = 0; i < trxPts.length - 1; i++) {
+//                    sword.lines.push({x1: trxPts[i].x, y1: trxPts[i].y, x2: trxPts[i + 1].x, y2: trxPts[i + 1].y})
+//                }
+//
+//                graphics.beginFill(0xFF0000);
+//                graphics.moveTo(trxPts[0].x, trxPts[0].y);
+//                for (var i = 1; i < trxPts.length; i++) {
+//                    graphics.lineTo(trxPts[i].x, trxPts[i].y);
+//                }
+//                graphics.endFill();
+//            });
+        }
+    }
+
+    function openServer() {
+        playersRef = new Firebase('https://shining-heat-5036.firebaseio.com/swordy/players');
+        playersIdentityRef = new Firebase('https://shining-heat-5036.firebaseio.com/swordy/playersIdentity');
+        playersRef.remove();
+        playersIdentityRef.remove();
+
+        playersRef.on('child_added', function(player) {
+
+            if (gameReady)
+                return;
+
+            var newPlayer = player.val();
+            var newIdentity = playersIdentityRef.push();
+            var playerToUpdate;
+            var playerIndex;
+            for (var i = 0; i < players.length; i++) {
+                if (!players[i].fbId) {
+                    playerIndex = i;
+                    playerToUpdate = players[i];
+                    break;
+                }
+            }
+
+            activatePlayer(playerToUpdate, newPlayer.id, newPlayer.color);
+            newIdentity.set({
+                playerId: newPlayer.id,
+                identity: playerIndex
+            });
+
+            connectedPlayers++;
+
+            if (connectedPlayers === NUMBER_OF_PLAYERS) {
+                gameReady = true;
+
+                var ordersRef = new Firebase('https://shining-heat-5036.firebaseio.com/swordy/orders');
+                ordersRef.remove();
+
+                ordersRef.on('child_added', function (snapshot) {
+                    var newOrder = snapshot.val();
+
+                    for (var i = 0; i < players.length; i++) {
+                        if (players[i].fbId === newOrder.id) {
+                            setPlayerMovementDirection(players[i], newOrder);
+                        }
+                    }
+                });
+            }
+        });
+    }
+
+    function restartGame() {
+        playersRef.off();
+        playersIdentityRef.off();
+        connectedPlayers = 0;
+        gameReady = false;
+        graphics.destroy();
+
+        swords.destroy();
+        for (var i = 0; i < players.length; i++) {
+            if (players[i].graphics) {
+                players[i].graphics.destroy();
+            }
+            players[i].destroy();
+        }
+        players.splice(0, players.length);
+        if (endGameText) {
+            endGameText.destroy();
+        }
+
+        createSwordsGroup();
+        createPlayers();
+        createTextObject();
+        openServer();
+
+        game.add.graphics(0, 0);
+        game.paused = false;
+    }
+
+    function setRandomPositionAndSpeed(object) {
+        var speedModifier = 300 + (Math.random() * 200);
+        var directionVector = {
+            x: Math.random() * speedModifier,
+            y: Math.random() * speedModifier
+        };
+        object.body.velocity.x = directionVector.x;
+        object.body.velocity.y = directionVector.y;
+
+        var xPos = Math.random();
+        if (xPos > 0.5) {
+            if (xPos > 0.75) {
+                //Right
+                object.x = game.world.width + 5;
+                object.body.velocity.x = -Math.abs(directionVector.x);
+            }
+            else {
+                //Left
+                object.x = -40;
+            }
+
+            if (Math.random() > 0.5) {
+                object.body.velocity.y = -Math.abs(directionVector.y);
+            }
+            object.y = Math.random() * (game.world.height + 10) - 5;
+        }
+        else {
+            if (xPos < 0.25) {
+                //Top
+                object.y = game.world.height - 5;
+                object.body.velocity.y = -Math.abs(directionVector.x);
+            }
+            else {
+                //Bottom
+                object.y = -40;
+            }
+
+            if (Math.random() > 0.5) {
+                object.body.velocity.x = -Math.abs(directionVector.x);
+            }
+            object.x = Math.random() * (game.world.width + 10) - 5;
+        }
+    }
+
+    function calcTrxPts(sword) {
+        var trxPts = [];
+        for (var i = 0; i < sword.pts.length; i++) {
+            var r = sword.radii[i];
+            var ptangle = sword.angles[i] + sword.changeAngle;
+            trxPts[i] = {
+                x: sword.x + r * Math.cos(ptangle),
+                y: sword.y + r * Math.sin(ptangle)
+            };
+        }
+        return (trxPts);
+    }
+
+    function hitSword(player, sword) {
+        var heroX = player.x + (player.width / 2);
+        var heroY = player.y + (player.height / 2);
+        var heroR = player.height / 2;
+
+        var trxPts = calcTrxPts(sword);
+        sword.lines = [];
+        for (var i = 0; i < trxPts.length - 1; i++) {
+            sword.lines.push({x1: trxPts[i].x, y1: trxPts[i].y, x2: trxPts[i + 1].x, y2: trxPts[i + 1].y})
+        }
+
+        for (var j = 0; j < sword.lines.length; j++) {
+            var line = sword.lines[j];
+
+            lineSegCircleIntercept(data, line.x1, line.y1, line.x2, line.y2, heroX, heroY, heroR);
+            if (data.result) {
+                players.splice(players.indexOf(player), 1);
+                player.graphics.destroy();
+                player.destroy();
+
+                if (players.length === 1) {
+                    endGameText.text = 'We have a winner!';
+                    endGameText.text.tint = players[0].color;
+                    endGameText.align = 'center';
+                    game.paused = true;
+                }
+            }
+        }
+
+    }
+
+    function lineSegCircleIntercept(ret, x1, y1, x2, y2, cx, cy, r) {
+        var vx, vy, u, u1, u2, d, ld, len, xx, yy;
+        vx = x2 - x1;  // convert line to vector
+        vy = y2 - y1;
+        ret.d2 = (vx * vx + vy * vy);
+
+        // get the unit distane of the near point on the line
+        ret.u = u = ((cx - x1) * vx + (cy - y1) * vy) / ret.d2;
+        xx = x1 + vx * u; // get the closest point
+        yy = y1 + vy * u;
+
+        // get the distance from the circle center
+        ret.d = d = Math.hypot(xx - cx, yy - cy);
+        if (d <= r) { // line is inside circle
+            // get the distance to the two intercept points
+            ld = Math.sqrt(r * r - d * d) / Math.sqrt(ret.d2);
+
+            // get that points unit distance along the line
+            u1 = u + ld;
+            if (u1 < 0) {  // is the forward intercept befor the line
+                ret.result = false;  // no intercept
+                return ret;
+            }
+            u2 = u - ld;
+            if (u2 > 1) {  // is the backward intercept past the end of the line
+                ret.result = false;  // no intercept
+                return ret;
+            }
+            ret.i = 0;
+            if (u1 <= 1) {
+                ret.i += 1;
+                // get the forward point line intercepts the circle
+                ret.x = x1 + vx * u1;
+                ret.y = y1 + vy * u1;
+            } else {
+                ret.x = x2;
+                ret.y = y2;
+
+            }
+            if (u2 >= 0) {
+                ret.x1 = x1 + vx * u2;
+                ret.y1 = y1 + vy * u2;
+                ret.i += 2;
+            } else {
+                ret.x1 = x1;
+                ret.y1 = y1;
+            }
+
+            // tough the points of intercept may not be on the line seg
+            // the closest point to the must be on the line segment
+            ret.result = true;
+            return ret;
+
+        }
+        ret.x = null; // flag that no intercept found at all;
+        ret.result = false;  // no intercept
+        return ret;
+
+    }
+
+</script>
+
+</body>
+</html>
