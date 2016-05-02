@@ -44,10 +44,10 @@
     };
 
     // Game variable (#1)
-    //Enter Code
+    var game = new Phaser.Game(GAME_WIDTH, GAME_HEIGHT, Phaser.AUTO, '', { preload: preload, create: create, update: update });
 
     // Firebase references (#2)
-    //Enter Code
+    var playersRef;
 
     // Preload (#3)
     function preload() {
