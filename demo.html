@@ -140,7 +140,6 @@
                 y: 32 - o
             }, {x: 42 - o, y: 50 - o}];
 
-            // precalculated properties -- for efficiency
             sword.changeAngle = 0;
             sword.radii = [];
             sword.angles = [];
@@ -153,7 +152,6 @@
                 sword.angles[i] = ((Math.atan2(dy, dx) + PI2) % PI2) - Math.PI;
             }
 
-//            game.physics.arcade.enable(sword);
             setRandomPositionAndSpeed(sword);
         }
     }
