@@ -21,6 +21,7 @@
     var PLAYER_SPEED = 270;
 
     var players = [];
+    var playersToRemove = [];
     var swords;
     var connectedPlayers = 0;
     var gameReady = false;
@@ -164,12 +165,31 @@
                 players[i].graphics = game.add.graphics(0, 0);
                 players[i].graphics.lineStyle(3, players[i].color, 1);
                 players[i].graphics.drawCircle(players[i].x + 14, players[i].y + 16, 20);
+
                 game.physics.arcade.overlap(players[i], swords, hitSword, null, this);
             }
 
             updatePlayerMovements();
             createSword();
+            removePlayers();
         }
+    }
+
+    function removePlayers() {
+        for (var i = 0; i < playersToRemove.length; i++) {
+
+            var player = playersToRemove[i];
+            players.splice(players.indexOf(player), 1);
+            player.graphics.destroy();
+            player.destroy();
+
+            if (players.length <= 1) {
+                endGameText.text = 'We have a winner!';
+                endGameText.align = 'center';
+                game.paused = true;
+            }
+        }
+        playersToRemove = [];
     }
 
     function openServer() {
@@ -227,14 +247,8 @@
 
             lineSegCircleIntercept(data, line.x1, line.y1, line.x2, line.y2, heroX, heroY, heroR);
             if (data.result) {
-                players.splice(players.indexOf(player), 1);
-                player.graphics.destroy();
-                player.destroy();
-
-                if (players.length === 1) {
-                    endGameText.text = 'We have a winner!';
-                    endGameText.align = 'center';
-                    game.paused = true;
+                if (playersToRemove.indexOf(player) === -1) {
+                    playersToRemove.push(player);
                 }
             }
         }
